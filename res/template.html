@@ -1,0 +1,61 @@
+<head>
+    <style>
+        table, td, tr {
+            border: 2px solid black;
+            border-collapse: collapse;
+        }
+    </style>
+</head>
+
+<body>
+   <p><span style="color: #808080;"><em>$SHOPNAME$</em></span></p>
+   <p><span style="color: #808080;"><em>$SHOPADDRESS$ - $SHOPPHONE$</em></span></p>
+   <p style="text-align: center;">__________________________________________________________________</p>
+
+   <p><strong><span style="color: #000000;">Họ t&ecirc;n:&nbsp;</span></strong><span style="color: #000000;">$PATIENTNAME$</span></p>
+   <p style="white-space: pre;"><strong>Giới tính:</strong> $PATIENTGENDER$&#9; <strong>Ngày sinh:</strong> $PATIENTBIRTH$&#9; <strong>SĐT: </strong> $PATIENTPHONENUMBER$</p>
+   <p><strong>Địa chỉ:&nbsp;</strong>$PATIENTADDRESS$</p>
+
+   <table style="width: 1748px;">
+      <tbody>
+         <tr>
+            <td>&nbsp;</td>
+            <td><strong>TL không kính</strong>&nbsp;</td>
+            <td><strong>Số đo độ</strong>&nbsp;</td>
+            <td><strong>TL có kính</strong>&nbsp;</td>
+            <td><strong>Nhãn áp</strong>&nbsp;</td>
+         </tr>
+         <tr>
+            <td><strong>MP</strong></td>
+            <td>$RNG$/10&nbsp;</td>
+            <td>$RD$</td>
+            <td>$RWG$/10&nbsp;</td>
+            <td>$RP$ mmHg&nbsp;</td>
+         </tr>
+         <tr>
+            <td><strong>MT</strong>&nbsp;</td>
+            <td>$LNG$/10&nbsp;</td>
+            <td>$LD$&nbsp;</td>
+            <td>$LWG$/10&nbsp;</td>
+            <td>$LP$ mmHg&nbsp;</td>
+         </tr>
+      </tbody>
+   </table>
+   <p><strong>Kết quả kh&aacute;m:</strong></p>
+   <p>$PATIENTRESULT$</p>
+   <p><strong>Chẩn đo&aacute;n:</strong></p>
+   <p>$PATIENTDIAGNOSIS$</p>
+   <p><strong>Danh s&aacute;ch thuốc:</strong></p>
+   <ol>
+   $PATIENTDRUGS$
+   </ol>
+   <p>&nbsp;</p>
+   <p>&nbsp;</p>
+   <p><span style="color: #000000;"><em>$PATIENTREVISIT$</em></span></p>
+   <p><span style="color: #000000;"><em>$PATIENTWARNNOPHONE$</em></span></p>
+   <p>&nbsp;</p>
+   <p style="text-align: right;"><em>$PATIENTPRESCRIBEDATE$</em></p>
+   <p style="text-align: right;">&nbsp;</p>
+   <p style="text-align: right;"><em>$DOCTORNAME$</em>&nbsp;</p>
+   <p style="text-align: right;">&nbsp;</p>
+</body>
