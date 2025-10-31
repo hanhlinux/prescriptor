@@ -1,6 +1,8 @@
 # prescriptor
 A tool supporting personal prescription work.
+<br>
 Tested platform: Windows 11 x86_64
+<br>
 Currently supported language: Vietnamese
 
 # Dependencies
