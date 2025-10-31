@@ -7,6 +7,7 @@ Currently supported language: Vietnamese
 
 # Dependencies
 - Qt 6.9.3 (requiring `core`, `gui`, `widgets`, `sql`, `printsupport`)
+- SQLite (using preinstalled SQL support of Qt)
 - Qt PDF
 - MinGW 13.1.10 x64 (requiring `c++17`)
 - `qmake`
