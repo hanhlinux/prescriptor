@@ -8,10 +8,6 @@ PatientCase::PatientCase(QObject *parent)
     id = 0;
 }
 
-PatientCase::PatientCase(const PatientCase& other) {}
-
-PatientCase& PatientCase::operator= (const PatientCase& other) {}
-
 void PatientCase::clear() {
     id = 0;
     gender = Male;

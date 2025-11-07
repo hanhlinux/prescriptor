@@ -22,17 +22,16 @@ class Printer
 public:
     Printer();
 
+    void prepareTemplate(const QString &dirPath);
+    void exportAndShowPrescription(const PatientCase &patientCase, const PatientDb &patientDb);
+
+private:
     QString templateContent;
     QFile templateFile;
     QTextDocument prescriptionOutput;
     QPrinter prescriptionPrinter;
     QPdfView prescriptionViewer;
     QPdfDocument *prescriptionPdfDoc;
-
-    void prepareTemplate(const QString &dirPath);
-    void exportAndShowPrescription(const PatientCase &patientCase, const PatientDb &patientDb);
-
-private:
     QPageLayout pageLayout;
 
     QString addElement(QString element);

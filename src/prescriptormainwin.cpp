@@ -14,11 +14,7 @@ PrescriptorMainWin::PrescriptorMainWin(QWidget *parent)
     QTextStream input;
     searchCurrentRow = -1;
 
-#ifdef _TESTING
     dbDirPath = QDir::homePath() + "/.prescriptor/";
-#else
-    dbDirPath = "#HOMEPATH#";
-#endif
 
     ui->setupUi(this);
 

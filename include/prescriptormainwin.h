@@ -16,8 +16,6 @@
 #include "patientdb.h"
 #include "printer.h"
 
-#define _TESTING
-
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class PrescriptorMainWin;

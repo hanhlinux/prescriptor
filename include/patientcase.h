@@ -11,8 +11,6 @@ public:
     enum Gender {Male = false, Female = true};
 
     PatientCase(QObject *parent = nullptr);
-    PatientCase(const PatientCase& other);
-    PatientCase& operator= (const PatientCase& other);
 
     int id;
     QString name, address, phoneNumber, dateOfBirth, result,
