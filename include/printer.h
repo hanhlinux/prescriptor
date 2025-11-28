@@ -4,6 +4,7 @@
 #include <QtPrintSupport/QPrinter>
 #include <QPrintDialog>
 #include <QTextDocument>
+#include <QTextEdit>
 #include <QFile>
 #include <QDir>
 #include <QMessageBox>
@@ -13,6 +14,8 @@
 #include <QRectF>
 #include <QPdfView>
 #include <QPdfDocument>
+#include <QWidget>
+#include <QLayout>
 
 #include "patientcase.h"
 #include "patientdb.h"
@@ -22,7 +25,8 @@ class Printer
 public:
     Printer();
 
-    void prepareTemplate(const QString &dirPath);
+    bool prepareTemplate(const QString &dirPath, QWidget *prev);
+    void processTemplate();
     void exportAndShowPrescription(const PatientCase &patientCase, const PatientDb &patientDb);
 
 private:
@@ -33,7 +37,9 @@ private:
     QPdfView prescriptionViewer;
     QPdfDocument *prescriptionPdfDoc;
     QPageLayout pageLayout;
+    QWidget *preview;
 
+    QString loadPatientInfo(const PatientCase &patientCase, const PatientDb &patientDb);
     QString addElement(QString element);
 };
 

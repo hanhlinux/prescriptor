@@ -9,6 +9,9 @@ class PatientCase : public QObject
     Q_OBJECT
 public:
     enum Gender {Male = false, Female = true};
+    enum Info {ID, PrescribeDate, PhoneNumber, Name, BOD, Sex, Address,
+                Result, Diagnosis, Note, WarnNoPhone, Drugs, RevisitPeriod,
+                RNG, RD, RWG, RP, LNG, LD, LWG, LP};
 
     PatientCase(QObject *parent = nullptr);
 

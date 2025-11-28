@@ -9,6 +9,7 @@ CONFIG += c++17 static
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    src/datacompletion.cpp \
     src/main.cpp \
     src/patientcase.cpp \
     src/patientdb.cpp \
@@ -18,10 +19,12 @@ SOURCES += \
 INCLUDEPATH += include/
 
 HEADERS += \
+    include/datacompletion.h \
     include/patientcase.h \
     include/patientdb.h \
     include/prescriptormainwin.h \
-    include/printer.h
+    include/printer.h \
+    src/datacompletion.h
 
 FORMS += \
     forms/prescriptormainwin.ui

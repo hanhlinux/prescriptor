@@ -5,95 +5,79 @@ PrescriptorMainWin::PrescriptorMainWin(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::PrescriptorMainWin)
 {
-    QString warningMessage;
-    QStringList drugsTableHeader = {"Xoá bỏ", "Tên thuốc", "Số lượng", "Cách sử dụng"};
-    searchTableHeader = {"ID", "Ngày khám", "Số điện thoại", "Họ và tên", "Ngày sinh", "Giới tính",
-                        "Địa chỉ", "Kết quả khám", "Chẩn đoán", "Ghi chú", "Hạn chế ĐT",
-                        "Danh sách thuốc", "Tái khám", "TLMP không kính", "Số đo MP", "TLMP có kính",
-                         "Áp suất MP", "TLMT không kính", "Số đo MT", "TLMT có kính", "Áp suất mắt trái"};
-    QTextStream input;
-    searchCurrentRow = -1;
-
-    dbDirPath = QDir::homePath() + "/.prescriptor/";
-
     ui->setupUi(this);
 
-    dianogsisFile.setFileName(dbDirPath + "dianogsis.txt");
-    drugsFile.setFileName(dbDirPath + "drugs.txt");
-    drugsUseFile.setFileName(dbDirPath + "usage.txt");
-    resultFile.setFileName(dbDirPath + "result.txt");
+    prepareResources();
+    prepareUIComponents();
+    setupPrescribeTab();
+    setupSearchTab();
+    setupPropertiesTab();
+}
 
-    if (!QDir(dbDirPath).exists()) {
+PrescriptorMainWin::~PrescriptorMainWin() {
+    for (int i = 0; i < 4; i++) {
+        if(dataCompletion[i].success)
+            dataCompletion[i].save();
+    }
+
+    delete ui;
+}
+
+void PrescriptorMainWin::operationError(const QString &msg) {
+    QMessageBox::critical(nullptr, "Lỗi", msg);
+}
+
+void PrescriptorMainWin::fatalError(const QString &msg) {
+    operationError(msg);
+    QTimer::singleShot(0, qApp, &QCoreApplication::quit);
+}
+
+
+void PrescriptorMainWin::prepareResources() {
+    bool allCompletionSuccess = true;
+    dbDirPath = QDir::homePath() + "/.prescriptor/";
+
+    if (!QDir(dbDirPath).exists())
         QDir().mkpath(dbDirPath);
+
+    int initSuccess = patientDb.init(dbDirPath);
+    if (initSuccess == PatientDb::CreationErr)
+        fatalError("Không tạo được CSDL để lưu đơn thuốc!");
+    else if (initSuccess == PatientDb::ConnectionErr)
+        fatalError("Không kết nối được với CSDL sử dụng lưu đơn thuốc!");
+
+    if(!printer.prepareTemplate(dbDirPath, ui->tabWidget->widget(3)))
+        fatalError("Thiếu file mẫu đơn của phần mềm HOẶC file mẫu đơn không thể mở được");
+
+    for (int i = 0; i < int(patientDb.completionList.size()); i++) {
+        dataCompletion[i].setup(dbDirPath, patientDb.completionList[i]);
+        if (!dataCompletion[i].success && allCompletionSuccess) {
+            allCompletionSuccess = false;
+            QMessageBox::warning(ui->Central, "Warning", "Không thể đọc một số danh sách dữ liệu gợi ý bệnh có sẵn");
+        }
     }
 
-    patientDb.init(dbDirPath);
+    if (dataCompletion[DataCompletion::Diagnosis].completer != nullptr)
+        ui->pre_diagnosisInput->setCompleter(dataCompletion[DataCompletion::Diagnosis].completer);
+    if (dataCompletion[DataCompletion::Result].completer != nullptr)
+        ui->pre_resultInput->setCompleter(dataCompletion[DataCompletion::Result].completer);
+    if (dataCompletion[DataCompletion::Drugs].completer != nullptr)
+        ui->pre_drugsInput->setCompleter(dataCompletion[DataCompletion::Drugs].completer);
+    if (dataCompletion[DataCompletion::DrugsUsage].completer != nullptr)
+        ui->pre_drugUsageInput->setCompleter(dataCompletion[DataCompletion::DrugsUsage].completer);
+}
 
-    if(!dianogsisFile.open(QIODevice::ReadWrite))
-        warningMessage += "+> dianogsis \n";
-    else {
-        input.setDevice(&dianogsisFile);
-        while (!input.atEnd()) dianogsisList << input.readLine();
-        dianogsisFile.close();
+void PrescriptorMainWin::prepareUIComponents() {
+    searchCurrentRow = -1;
 
-        diagnosisListModel = new QStringListModel(dianogsisList);
-        diagnosisCompleter = new QCompleter(diagnosisListModel);
-        diagnosisCompleter->setCompletionMode(QCompleter::PopupCompletion);
-        diagnosisCompleter->setCaseSensitivity(Qt::CaseInsensitive);
-        ui->pre_diagnosisInput->setCompleter(diagnosisCompleter);
-    }
-
-    if (!drugsFile.open(QIODevice::ReadWrite))
-        warningMessage += "+> List of drugs\n";
-    else {
-        input.setDevice(&drugsFile);
-        while (!input.atEnd()) drugsList << input.readLine();
-        drugsFile.close();
-
-        drugsListModel = new QStringListModel(drugsList);
-        drugsCompleter = new QCompleter(drugsListModel);
-        drugsCompleter->setCompletionMode(QCompleter::PopupCompletion);
-        drugsCompleter->setCaseSensitivity(Qt::CaseInsensitive);
-        ui->pre_drugsInput->setCompleter(drugsCompleter);
-    }
-
-    if (!drugsUseFile.open(QIODevice::ReadWrite))
-        warningMessage += "+> Drugs usage\n";
-    else {
-        input.setDevice(&drugsUseFile);
-        while (!input.atEnd()) drugsUseList << input.readLine();
-        drugsUseFile.close();
-
-        drugsUseListModel = new QStringListModel(drugsUseList);
-        drugsUseCompleter = new QCompleter(drugsUseListModel);
-        drugsUseCompleter->setCompletionMode(QCompleter::PopupCompletion);
-        drugsUseCompleter->setCaseSensitivity(Qt::CaseInsensitive);
-        ui->pre_drugUsageInput->setCompleter(drugsUseCompleter);
-    }
-
-    if (!resultFile.open(QIODevice::ReadWrite))
-        warningMessage += "+> Result\n";
-    else {
-        input.setDevice(&resultFile);
-        while (!input.atEnd()) resultList << input.readLine();
-        resultFile.close();
-
-        resultListModel = new QStringListModel(resultList);
-        resultCompleter = new QCompleter(resultListModel);
-        resultCompleter->setCompletionMode(QCompleter::PopupCompletion);
-        resultCompleter->setCaseSensitivity(Qt::CaseInsensitive);
-        ui->pre_resultInput->setCompleter(resultCompleter);
-    }
-
-    if (warningMessage != "") {
-        warningMessage = "Failed to get these autocompletion file: \n";
-        QMessageBox::warning(ui->Central, "Warning", warningMessage);
-    }
-
-    printer.prepareTemplate(dbDirPath);
+    windowScroll = new QScrollArea();
+    windowScroll->setWidget(ui->PrescriptTab);
+    windowScroll->setWidgetResizable(true);
+    ui->tabWidget->insertTab(0, windowScroll, "Kê đơn thuốc");
+    ui->tabWidget->setCurrentIndex(0);
 
     ui->pre_drugsView->setColumnCount(4);
-    ui->pre_drugsView->setHorizontalHeaderLabels(drugsTableHeader);
+    ui->pre_drugsView->setHorizontalHeaderLabels(patientDb.drugsTableHeader);
     ui->pre_drugsView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->pre_revisitperiodInput->setEnabled(false);
 
@@ -102,92 +86,66 @@ PrescriptorMainWin::PrescriptorMainWin(QWidget *parent)
     ui->search_patientTableView->setModel(patientInfoTableModel);
     ui->search_patientTableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 
-    for (int i = 0; i < searchTableHeader.count(); i++) {
-        if ((i > 0 && i < 9 && i != 5) || i == 11) {
-            patientInfoTableModel->setHeaderData(i, Qt::Horizontal, searchTableHeader[i]);
-        }
-        else {
+    for (int i = 0; i < patientDb.searchTableHeader.count(); i++) {
+        if (i > PatientCase::ID && i < PatientCase::Result && i != PatientCase::Sex)
+            patientInfoTableModel->setHeaderData(i, Qt::Horizontal, patientDb.searchTableHeader[i]);
+        else
             ui->search_patientTableView->hideColumn(i);
-        }
     }
 
     ui->prop_addrInput->setText(patientDb.shopAddress);
     ui->prop_doctorInput->setText(patientDb.doctorName);
     ui->prop_nameInput->setText(patientDb.shopName);
     ui->prop_phoneNumInput->setText(patientDb.shopPhoneNum);
+}
+
+void PrescriptorMainWin::setupPrescribeTab() {
+    switchCell(ui->pre_nameInput, ui->pre_addressInput);
+    switchCell(ui->pre_addressInput, ui->pre_birthInput);
+    switchCell(ui->pre_birthInput, ui->pre_phoneNumberInput);
+    switchCell(ui->pre_phoneNumberInput, ui->pre_rightNoGlassInput);
+    switchCell(ui->pre_rightNoGlassInput, ui->pre_rightGlassDioptreInput);
+    switchCell(ui->pre_rightGlassDioptreInput, ui->pre_rightGlassVisionInput);
+    switchCell(ui->pre_rightGlassVisionInput, ui->pre_rightEyePressureInput);
+    switchCell(ui->pre_rightEyePressureInput, ui->pre_leftNoGlassInput);
+    switchCell(ui->pre_leftNoGlassInput, ui->pre_leftGlassDioptreInput);
+    switchCell(ui->pre_leftGlassDioptreInput, ui->pre_leftGlassVisionInput);
+    switchCell(ui->pre_leftGlassVisionInput, ui->pre_leftEyePressureInput);
+    switchCell(ui->pre_leftEyePressureInput, ui->pre_resultInput);
+
 
     connect(ui->pre_removePreBtn, &QPushButton::clicked, this, &PrescriptorMainWin::clearAll);
-    connect(ui->pre_diagnosisInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::diagnosisEnter);
     connect(ui->pre_drugsInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::drugsNameEnter);
     connect(ui->pre_drugHowmanyInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::drugsNumEnter);
     connect(ui->pre_drugUsageInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::drugsUseEnter);
     connect(ui->pre_savePreBtn, &QPushButton::clicked, this, &PrescriptorMainWin::savePre);
     connect(ui->pre_revisitCheckbox, &QCheckBox::checkStateChanged, this, &PrescriptorMainWin::revisitCheck);
-    connect(ui->pre_resultInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::resultEnter);
+    connect(ui->pre_resultInput, &QLineEdit::returnPressed, this,
+            [this]() {resAndDiagEnter(ui->pre_resultInput, ui->pre_resultListInput, ui->pre_diagnosisInput, DataCompletion::Result);});
+    connect(ui->pre_diagnosisInput, &QLineEdit::returnPressed, this,
+            [this]() {resAndDiagEnter(ui->pre_diagnosisInput, ui->pre_diagnosisListInput, ui->pre_drugsInput, DataCompletion::Diagnosis);});
 
-    // Switch cell
-    connect(ui->pre_nameInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterName);
-    connect(ui->pre_addressInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterAddress);
-    connect(ui->pre_birthInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterBOD);
-    connect(ui->pre_phoneNumberInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterPhoneNum);
-    connect(ui->pre_rightNoGlassInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterRightNoGlass);
-    connect(ui->pre_rightGlassDioptreInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterRightDioptre);
-    connect(ui->pre_rightGlassVisionInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterRightWithGlass);
-    connect(ui->pre_rightEyePressureInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterRightPressure);
-    connect(ui->pre_leftNoGlassInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterLeftNoGlass);
-    connect(ui->pre_leftGlassDioptreInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterLeftDioptre);
-    connect(ui->pre_leftGlassVisionInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterLeftWithGlass);
-    connect(ui->pre_leftEyePressureInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::enterLeftPressure);
+    connect(dataCompletion[0].completer, qOverload<const QString&>(&QCompleter::activated),
+            this, [this]() {ui->pre_resultInput->clear();}, Qt::QueuedConnection);
+    connect(dataCompletion[1].completer, qOverload<const QString&>(&QCompleter::activated),
+            this, [this]() {ui->pre_resultInput->clear();}, Qt::QueuedConnection);
+    connect(ui->pre_printPreBtn, &QPushButton::clicked, this, &PrescriptorMainWin::printPatientInfo);
+}
 
+void PrescriptorMainWin::setupSearchTab() {
     connect(ui->search_searchBtn, &QPushButton::clicked, this, &PrescriptorMainWin::searchPatient);
     connect(ui->search_nameOrPhoneNumInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::searchPatient);
     connect(ui->search_patientTableView, &QTableView::clicked, this, &PrescriptorMainWin::showPatientInfo);
     connect(ui->search_editPreBtn, &QPushButton::clicked, this, &PrescriptorMainWin::editPatientInfo);
     connect(ui->search_inheritOldPreBtn, &QPushButton::clicked, this, [this]() {inheritPatientInfo(false);});
     connect(ui->search_removePreBtn, &QPushButton::clicked, this, &PrescriptorMainWin::deletePatientInfo);
-    connect(ui->pre_printPreBtn, &QPushButton::clicked, this, &PrescriptorMainWin::printPatientInfo);
     connect(ui->search_printPreBtn, &QPushButton::clicked, this, &PrescriptorMainWin::printPatientInfo);
-    connect(ui->prop_saveInfo, &QPushButton::clicked, this, &PrescriptorMainWin::savePrescriptorInfo);
-
-    connect(ui->prop_backupBtn, &QPushButton::clicked, this, &PrescriptorMainWin::backupData);
-    connect(ui->prop_recoverBtn, &QPushButton::clicked, this, &PrescriptorMainWin::restoreData);
 }
 
-PrescriptorMainWin::~PrescriptorMainWin()   {
-    QTextStream output;
-    if (dianogsisFile.open(QIODevice::WriteOnly)) {
-        output.setDevice(&dianogsisFile);
-        for (int i = 0; i < int(dianogsisList.count()); i++) {
-            output << dianogsisList[i] << "\n";
-        }
-        dianogsisFile.close();
-    }
-
-    if (drugsFile.open(QIODevice::WriteOnly)) {
-        output.setDevice(&drugsFile);
-        for (int i = 0; i < int(drugsList.count()); i++) {
-            output << drugsList[i] << "\n";
-        }
-        drugsFile.close();
-    }
-
-    if (drugsUseFile.open(QIODevice::WriteOnly)) {
-        output.setDevice(&drugsUseFile);
-        for (int i = 0; i < int(drugsUseList.count()); i++) {
-            output << drugsUseList[i] << "\n";
-        }
-        drugsUseFile.close();
-    }
-
-    if (resultFile.open(QIODevice::WriteOnly)) {
-        output.setDevice(&resultFile);
-        for (int i = 0; i < int(drugsUseList.count()); i++) {
-            output << drugsUseList[i] << "\n";
-        }
-        resultFile.close();
-    }
-
-    delete ui;
+void PrescriptorMainWin::setupPropertiesTab() {
+    connect(ui->prop_saveInfo, &QPushButton::clicked, this, &PrescriptorMainWin::savePrescriptorInfo);
+    connect(ui->prop_backupBtn, &QPushButton::clicked, this, &PrescriptorMainWin::backupData);
+    connect(ui->prop_recoverBtn, &QPushButton::clicked, this, &PrescriptorMainWin::restoreData);
 }
 
 void PrescriptorMainWin::resizeEvent(QResizeEvent *event)   {
@@ -198,50 +156,27 @@ void PrescriptorMainWin::resizeEvent(QResizeEvent *event)   {
     QMainWindow::resizeEvent(event);
 }
 
-void PrescriptorMainWin::resultEnter() {
-    if (ui->pre_resultInput->text() == "") return;
-
-    if (!dianogsisList.contains(ui->pre_resultInput->text())) {
-        dianogsisList << ui->pre_resultInput->text();
-        dianogsisList.sort();
+void PrescriptorMainWin::resAndDiagEnter(QLineEdit *current, QTextEdit *list, QLineEdit *next, int type) {
+    if (current->text() == "") {
+        next->setFocus();
+        return;
     }
-    diagnosisListModel->setStringList(resultList);
+
+    if (!dataCompletion[type].content.contains(current->text()))
+        dataCompletion[type].update(current->text());
 
     QString br = "";
-    if (ui->pre_resultListInput->toPlainText() != "") {
+    if (list->toPlainText() != "")
         br = "\n";
-    }
-    ui->pre_resultListInput->setText(ui->pre_resultListInput->toPlainText()
-                                        + br + ui->pre_resultInput->text());
-    ui->pre_resultInput->clear();
-}
-
-void PrescriptorMainWin::diagnosisEnter() {
-    if (ui->pre_diagnosisInput->text() == "") return;
-
-    if (!dianogsisList.contains(ui->pre_diagnosisInput->text())) {
-        dianogsisList << ui->pre_diagnosisInput->text();
-        dianogsisList.sort();
-    }
-    diagnosisListModel->setStringList(dianogsisList);
-
-    QString br = "";
-    if (ui->pre_diagnosisListInput->toPlainText() != "") {
-        br = "\n";
-    }
-    ui->pre_diagnosisListInput->setText(ui->pre_diagnosisListInput->toPlainText()
-                                        + br + ui->pre_diagnosisInput->text());
-    ui->pre_diagnosisInput->clear();
+    list->setText(list->toPlainText() + br + current->text());
+    current->clear();
 }
 
 void PrescriptorMainWin::drugsNameEnter() {
     if (ui->pre_drugsInput->text() == "") return;
 
-    if (!drugsList.contains(ui->pre_drugsInput->text())) {
-        drugsList << ui->pre_drugsInput->text();
-        drugsList.sort();
-    }
-    drugsListModel->setStringList(drugsList);
+    if (!dataCompletion[2].content.contains(ui->pre_drugsInput->text()))
+        dataCompletion[2].update(ui->pre_drugsInput->text());
     ui->pre_drugHowmanyInput->setFocus();
 }
 
@@ -250,22 +185,23 @@ void PrescriptorMainWin::drugsNumEnter() {
     ui->pre_drugUsageInput->setFocus();
 }
 
-void PrescriptorMainWin::drugsUseEnter() {
+void PrescriptorMainWin::insertDrugRow(const QString &name, const QString &num, const QString &usage) {
     int rowPos = ui->pre_drugsView->rowCount();
     QPushButton *delDrugbtn = new QPushButton("Xoá bỏ");
 
     connect(delDrugbtn, &QPushButton::clicked, this, &PrescriptorMainWin::deleteDrug);
     ui->pre_drugsView->insertRow(rowPos);
     ui->pre_drugsView->setCellWidget(rowPos, 0, delDrugbtn);
-    ui->pre_drugsView->setItem(rowPos, 1, new QTableWidgetItem(ui->pre_drugsInput->text()));
-    ui->pre_drugsView->setItem(rowPos, 2, new QTableWidgetItem(ui->pre_drugHowmanyInput->text()));
-    ui->pre_drugsView->setItem(rowPos, 3, new QTableWidgetItem(ui->pre_drugUsageInput->text()));
+    ui->pre_drugsView->setItem(rowPos, 1, new QTableWidgetItem(name));
+    ui->pre_drugsView->setItem(rowPos, 2, new QTableWidgetItem(num));
+    ui->pre_drugsView->setItem(rowPos, 3, new QTableWidgetItem(usage));
+}
 
-    if (!drugsUseList.contains(ui->pre_drugUsageInput->text())) {
-        drugsUseList << ui->pre_drugUsageInput->text();
-        drugsUseList.sort();
-    }
-    drugsUseListModel->setStringList(drugsUseList);
+void PrescriptorMainWin::drugsUseEnter() {
+    insertDrugRow(ui->pre_drugsInput->text(), ui->pre_drugHowmanyInput->text(), ui->pre_drugUsageInput->text());
+
+    if (!dataCompletion[3].content.contains(ui->pre_drugUsageInput->text()))
+        dataCompletion[3].update(ui->pre_drugUsageInput->text());
 
     ui->pre_drugsInput->clear();
     ui->pre_drugHowmanyInput->clear();
@@ -284,22 +220,100 @@ void PrescriptorMainWin::revisitCheck() {
 void PrescriptorMainWin::showPatientInfo() {
     setSearchCurrentRow();
     ui->search_printPreBtn->setEnabled(true);
-    QString allInfo;
-    for (int i = 1; i < searchTableHeader.count(); i++) {
-        if (i == 5) {
-            if (getCellData(searchCurrentRow, i).toBool() == PatientCase::Male) {
-                allInfo += searchTableHeader[i] + ": " + "Nam" + "\n";
-            }
-            else {
-                allInfo += searchTableHeader[i] + ": " + "Nữ" + "\n";
-            }
-        }
-        else {
-            allInfo += searchTableHeader[i] + ": " + getCellData(searchCurrentRow, i).toString() + "\n";
-        }
-    }
-    ui->search_patientInfoView->setText(allInfo);
+    loadSearchPatientInfo();
+}
 
+void PrescriptorMainWin::loadSearchPatientInfo() {
+    QString result = cellCol(PatientCase::Result).toString();
+    QString diagnosis = cellCol(PatientCase::Diagnosis).toString();
+    QStringList drugsList = cellCol(PatientCase::Drugs).toString().split("\n", Qt::SkipEmptyParts);
+    QStringList pBold = {"p", "strong"};
+    QStringList tdBold = {"td", "strong"};
+
+    displayContent.clear();
+    result.replace("\n", "<br>");
+    diagnosis.replace("\n", "<br>");
+
+    insertInfo(patientDb.searchTableHeader[PatientCase::PrescribeDate], cellCol(PatientCase::PrescribeDate).toString());
+    insertInfo(patientDb.searchTableHeader[PatientCase::Name], cellCol(PatientCase::Name).toString());
+    if (cellCol(PatientCase::Sex).toBool() == PatientCase::Male)
+        insertInfo(patientDb.searchTableHeader[PatientCase::Sex], "Nam");
+    else
+        insertInfo(patientDb.searchTableHeader[PatientCase::Sex], "Nữ");
+    insertInfo(patientDb.searchTableHeader[PatientCase::BOD], cellCol(PatientCase::BOD).toString());
+    insertInfo(patientDb.searchTableHeader[PatientCase::PhoneNumber], cellCol(PatientCase::PhoneNumber).toString());
+    insertInfo(patientDb.searchTableHeader[PatientCase::Address], cellCol(PatientCase::Address).toString());
+
+    displayContent << "<table width=100% border=1><tr>\n";
+    insertLine(pBold, "Thị lực: ");
+    insertLine("td", "&nbsp;");
+    insertLine(tdBold, "Thị lực không kính (X/10)");
+    insertLine(tdBold, "Số đo độ (Dioptre)");
+    insertLine(tdBold, "Thị lực có kính (X/10)");
+    insertLine(tdBold, "Nhãn áp (mmHg)");
+    displayContent << "</tr><tr>";
+    insertLine(tdBold, "MP");
+    insertLine("td", cellCol(PatientCase::RNG).toString());
+    insertLine("td", cellCol(PatientCase::RD).toString());
+    insertLine("td", cellCol(PatientCase::RWG).toString());
+    insertLine("td", cellCol(PatientCase::RP).toString());
+    displayContent << "</tr><tr>";
+    insertLine(tdBold, "MT");
+    insertLine("td", cellCol(PatientCase::LNG).toString());
+    insertLine("td", cellCol(PatientCase::LD).toString());
+    insertLine("td", cellCol(PatientCase::LWG).toString());
+    insertLine("td", cellCol(PatientCase::LP).toString());
+    displayContent << "</tr></table>";
+
+    insertLine(pBold, "Kết quả khám:");
+    insertLine("p", result);
+
+    insertLine(pBold, "Chẩn đoán:");
+    insertLine("p", diagnosis);
+
+    insertLine(pBold, "Danh sách thuốc:");
+    displayContent << "<ol>";
+    for (int i = 0; i < drugsList.count(); i++) {
+        QString res = drugsList[i].replace("::", ", ") + ".";
+        insertLine("li", res);
+    }
+    displayContent << "</ol>";
+
+    insertLine(pBold, "Ghi chú: ");
+    displayContent << "<ul>";
+    if (cellCol(PatientCase::Note).toString().length() > 0)
+        insertLine("li", cellCol(PatientCase::Note).toString());
+    if (cellCol(PatientCase::RevisitPeriod).toString().length() > 0)
+        insertLine("li", cellCol(PatientCase::RevisitPeriod).toString());
+    if (cellCol(PatientCase::WarnNoPhone).toBool())
+        insertLine("li", "Hạn chế tiếp xúc với các thiết bị điện tử như TV, iPad (tablet), điện thoại thông minh,...");
+    displayContent << "</ul>";
+
+    ui->search_patientInfoView->setHtml(displayContent.join("\n"));
+}
+
+void PrescriptorMainWin::insertLine(const QString &tag, const QString &content, QString format) {
+    displayContent << "<" + tag + " " + format + " >" + content + "</" + tag + ">";
+}
+
+void PrescriptorMainWin::insertLine(const QStringList &tag, const QString &content) {
+    QString res;
+    for (int i = 0; i < int(tag.count()); i++) {
+        res += "<" + tag[i] + ">";
+    }
+    res += content;
+    for (int i = int(tag.count()) - 1; i >= 0; i--) {
+        res += "</" + tag[i] + ">";
+    }
+
+    displayContent << res;
+}
+
+void PrescriptorMainWin::insertInfo(const QString &key, const QString &val) {
+    QString line = "<p><strong>key: </strong>val</p>";
+    line.replace("key", key);
+    line.replace("val", val);
+    displayContent << line;
 }
 
 void PrescriptorMainWin::editPatientInfo() {
@@ -320,17 +334,8 @@ void PrescriptorMainWin::editPatientInfo() {
     ui->pre_leftGlassVisionInput->setText(patientCase.leftWithGlass);
     ui->pre_leftEyePressureInput->setText(patientCase.leftPressure);
 
-    for (int i = 0; i < patientCase.drugsList.count(); i++) {
-        int row = ui->pre_drugsView->rowCount();
-        QPushButton *delDrugbtn = new QPushButton("Xoá bỏ");
-
-        ui->pre_drugsView->insertRow(row);
-        ui->pre_drugsView->setCellWidget(row, 0, delDrugbtn);
-        ui->pre_drugsView->setItem(row, 1, new QTableWidgetItem(patientCase.drugsList[i][0]));
-        ui->pre_drugsView->setItem(row, 2, new QTableWidgetItem(patientCase.drugsList[i][1]));
-        ui->pre_drugsView->setItem(row, 3, new QTableWidgetItem(patientCase.drugsList[i][2]));
-        connect(delDrugbtn, &QPushButton::clicked, this, &PrescriptorMainWin::deleteDrug);
-    }
+    for (int i = 0; i < patientCase.drugsList.count(); i++)
+        insertDrugRow(patientCase.drugsList[i][0], patientCase.drugsList[i][1], patientCase.drugsList[i][2]);
 }
 
 void PrescriptorMainWin::inheritPatientInfo(bool copyFull) {
@@ -349,38 +354,37 @@ void PrescriptorMainWin::copyPatientInfo(bool copyFull) {
     clearAll();
     setSearchCurrentRow();
 
-    patientCase.prescribeDate = getCellData(searchCurrentRow, 1).toString();
-    patientCase.phoneNumber = getCellData(searchCurrentRow, 2).toString();
-    patientCase.name = getCellData(searchCurrentRow, 3).toString();
-    patientCase.dateOfBirth = getCellData(searchCurrentRow, 4).toString();
-    patientCase.gender = getCellData(searchCurrentRow, 5).toBool();
-    patientCase.address = getCellData(searchCurrentRow, 6).toString();
+    patientCase.prescribeDate = cellCol(1).toString();
+    patientCase.phoneNumber = cellCol(2).toString();
+    patientCase.name = cellCol(3).toString();
+    patientCase.dateOfBirth = cellCol(4).toString();
+    patientCase.gender = cellCol(5).toBool();
+    patientCase.address = cellCol(6).toString();
 
     if (copyFull == true) {
-        patientCase.id = getCellData(searchCurrentRow, 0).toInt();
-        patientCase.result = getCellData(searchCurrentRow, 7).toString();
-        patientCase.diagnosis = getCellData(searchCurrentRow, 8).toString();
-        patientCase.note = getCellData(searchCurrentRow, 9).toString();
-        patientCase.warnNoPhone = getCellData(searchCurrentRow, 10).toBool();
-        patientCase.revisitPeriod = getCellData(searchCurrentRow, 12).toString();
-        patientCase.rightNoGlass = getCellData(searchCurrentRow, 13).toString();
-        patientCase.rightDioptre = getCellData(searchCurrentRow, 14).toString();
-        patientCase.rightWithGlass = getCellData(searchCurrentRow, 15).toString();
-        patientCase.rightPressure = getCellData(searchCurrentRow, 16).toString();
-        patientCase.leftNoGlass = getCellData(searchCurrentRow, 17).toString();
-        patientCase.leftDioptre = getCellData(searchCurrentRow, 18).toString();
-        patientCase.leftWithGlass = getCellData(searchCurrentRow, 19).toString();
-        patientCase.leftPressure = getCellData(searchCurrentRow, 20).toString();
-        QStringList temp = getCellData(searchCurrentRow, 11).toString().split("\n", Qt::SkipEmptyParts);
+        patientCase.id = cellCol(0).toInt();
+        patientCase.result = cellCol(7).toString();
+        patientCase.diagnosis = cellCol(8).toString();
+        patientCase.note = cellCol(9).toString();
+        patientCase.warnNoPhone = cellCol(10).toBool();
+        patientCase.revisitPeriod = cellCol(12).toString();
+        patientCase.rightNoGlass = cellCol(13).toString();
+        patientCase.rightDioptre = cellCol(14).toString();
+        patientCase.rightWithGlass = cellCol(15).toString();
+        patientCase.rightPressure = cellCol(16).toString();
+        patientCase.leftNoGlass = cellCol(17).toString();
+        patientCase.leftDioptre = cellCol(18).toString();
+        patientCase.leftWithGlass = cellCol(19).toString();
+        patientCase.leftPressure = cellCol(20).toString();
+        QStringList temp = cellCol(11).toString().split("\n", Qt::SkipEmptyParts);
         for (int i = 0; i < temp.count(); i++) {
-            qDebug() << temp[i];
             patientCase.drugsList.append(temp[i].split("::"));
         }
     }
 }
 
-QVariant PrescriptorMainWin::getCellData(int row, int column) {
-    return patientInfoTableModel->data(patientInfoTableModel->index(row, column));
+QVariant PrescriptorMainWin::cellCol(int column) {
+    return patientInfoTableModel->data(patientInfoTableModel->index(searchCurrentRow, column));
 }
 
 void PrescriptorMainWin::searchPatient() {
@@ -397,35 +401,31 @@ void PrescriptorMainWin::searchPatient() {
 }
 
 void PrescriptorMainWin::setSearchCurrentRow() {
-        searchCurrentRow = ui->search_patientTableView->selectionModel()->selectedIndexes()[0].row();
+    searchCurrentRow = ui->search_patientTableView->selectionModel()->selectedIndexes()[0].row();
 }
 
 void PrescriptorMainWin::deletePatientInfo() {
     setSearchCurrentRow();
-    patientDb.query->exec("DELETE FROM patients "
-                          "WHERE id = '" + getCellData(searchCurrentRow, 0).toString() + "'");
+    patientDb.removePatient(cellCol(0).toString());
     patientInfoTableModel->setQuery(patientDb.getQuery());
 }
 
-void PrescriptorMainWin::savePre() {
+bool PrescriptorMainWin::savePre() {
     if (ui->pre_nameInput->text() == "") {
-        QMessageBox::critical(nullptr, "Lỗi", "Tên bệnh nhân không được để trống!");
-        return;
+        operationError("Tên bệnh nhân không được để trống!");
+        return false;
     }
 
-    if (patientCase.id != 0 && ui->pre_nameInput->text() == patientCase.name) {
-        patientDb.query->exec("DELETE FROM patients "
-                            "WHERE id = '" + QString::number(patientCase.id) + "'");
+    if (patientCase.id != 0 && ui->pre_nameInput->text() == patientCase.name)
+        patientDb.removePatient(QString::number(patientCase.id));
+
+    int tempID = patientDb.getNextID();
+    if (tempID == -1) {
+        operationError("Không thêm được đơn thuốc vào CSDL [ID]");
+        return false;
     }
 
-    patientDb.query->exec("SELECT id "
-                          "FROM patients "
-                          "ORDER BY id DESC "
-                          "LIMIT 1");
-    while (patientDb.query->next()) {
-        patientCase.id = patientDb.query->value(0).toInt() + 1;
-    }
-
+    patientCase.id = tempID;
     patientCase.prescribeDate = QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss");
     patientCase.name = ui->pre_nameInput->text();
     patientCase.dateOfBirth = ui->pre_birthInput->text();
@@ -457,24 +457,24 @@ void PrescriptorMainWin::savePre() {
 
     bool res = patientCase.saveToDb(patientDb);
     if (res == false) {
-        QMessageBox::critical(nullptr, "Error", "Cannot insert patient information into database: " + patientDb.query->lastError().text());
+        operationError("Không thêm được đơn thuốc vào CSDL! Chi tiết lỗi: \n" + patientDb.query->lastError().text());
         ui->pre_stateLabel->setText("Không lưu được thông tin bệnh nhân!");
+        return false;
     }
 
-    if (res == true) {
-        ui->pre_stateLabel->setText("Đã lưu thành công!");
-    }
-
+    ui->pre_stateLabel->setText("Đã lưu thành công!");
     patientInfoTableModel->setQuery(patientDb.getQuery());
+    return true;
 }
 
 void PrescriptorMainWin::printPatientInfo() {
     if (ui->tabWidget->currentIndex() == 0) {
-        savePre();
+        if (!savePre()) return;
     }
     else if (ui->tabWidget->currentIndex() == 1 && searchCurrentRow != -1) {
         copyPatientInfo(true);
     }
+    ui->tabWidget->setCurrentIndex(3);
     printer.exportAndShowPrescription(patientCase, patientDb);
 }
 
@@ -489,114 +489,66 @@ void PrescriptorMainWin::savePrescriptorInfo() {
 
 void PrescriptorMainWin::clearAll()
 {
-    ui->pre_addressInput->clear();
-    ui->pre_birthInput->setText("01/01/2000");
-    ui->pre_diagnosisInput->clear();
-    ui->pre_diagnosisListInput->clear();
-    ui->pre_drugsInput->clear();
-    ui->pre_drugHowmanyInput->clear();
-    ui->pre_drugUsageInput->clear();
-    ui->pre_drugsView->model()->removeRows(0, ui->pre_drugsView->model()->rowCount());
-    ui->pre_leftEyePressureInput->clear();
-    ui->pre_leftGlassDioptreInput->clear();
-    ui->pre_leftGlassVisionInput->clear();
-    ui->pre_leftNoGlassInput->clear();
-    ui->pre_nameInput->clear();
-    ui->pre_noteInput->clear();
-    ui->pre_phoneNumberInput->clear();
+    QList<QLineEdit *> lineInput = ui->tabWidget[0].findChildren<QLineEdit *>();
+    for (int i = 0; i < int(lineInput.count()); i++) {
+        lineInput[i]->clear();
+    }
+
+    QList<QTextEdit *> listInput = ui->tabWidget[0].findChildren<QTextEdit *>();
+    for (int i = 0; i < int(listInput.count()); i++) {
+        listInput[i]->clear();
+    }
+
     ui->pre_revisitCheckbox->setChecked(false);
-    ui->pre_revisitperiodInput->clear();
     ui->pre_revisitperiodInput->setEnabled(false);
-    ui->pre_rightEyePressureInput->clear();
-    ui->pre_rightGlassDioptreInput->clear();
-    ui->pre_rightGlassVisionInput->clear();
-    ui->pre_rightNoGlassInput->clear();
+    ui->pre_drugsView->model()->removeRows(0, ui->pre_drugsView->model()->rowCount());
+    ui->pre_YearsOld->clear();
 
     patientCase.clear();
 }
 
 void PrescriptorMainWin::backupData() {
-    QString backupDir = bacAndRecDialog.getExistingDirectory(this, "Sao lưu dữ liệu", QDir::homePath(), QFileDialog::ShowDirsOnly)
-                        + "/Backup-" + QDateTime::currentDateTime().toString("dd-MM-yyyy-hh-mm-ss");
-    QDirIterator it(dbDirPath, QDirIterator::Subdirectories);
-    QDir().mkpath(backupDir);
-    while (it.hasNext()) {
-        QString sourcePath = it.next();
-        QStringList fileName = sourcePath.split("/");
+    QString backupDir = bacAndRecDialog.getExistingDirectory(this, "Sao lưu dữ liệu", QDir::homePath(), QFileDialog::ShowDirsOnly);
+    if (backupDir == "") return;
+    backupDir += "/Backup-" + QDateTime::currentDateTime().toString("dd-MM-yyyy-hh-mm-ss");
 
-        QFile(sourcePath).copy(backupDir + "/" + fileName[fileName.count() - 1]);
+    bool success = patientDb.backupData(backupDir);
+
+    if (!success) {
+        ui->prop_currentState->clear();
+        operationError("Đã có lỗi xảy ra trong quá trình sao lưu!");
+        return;
     }
-
-    ui->prop_currentState->setText("Đã sao lưu thành công!");
+        ui->prop_currentState->setText("Đã sao lưu thành công!");
 }
 
 void PrescriptorMainWin::restoreData() {
     QString restoreDir = bacAndRecDialog.getExistingDirectory(this, "Khôi phục dữ liệu", QDir::homePath(), QFileDialog::ShowDirsOnly);
-    if (!QFile(restoreDir + "/prescriptions.db").exists() || !QFile(restoreDir + "/template.html").exists()) {
-        QMessageBox::critical(nullptr, "Lỗi", "Bản sao lưu thiếu mẫu đơn (template.html) hoặc dữ liệu bệnh nhân (prescriptions.db)");
+    if (restoreDir == "") return;
+    int code = patientDb.restoreData(restoreDir);
+
+    if (code == PatientDb::CorruptedBackup) {
+        ui->prop_currentState->clear();
+        operationError("Bản sao lưu thiếu mẫu đơn (template.html) hoặc dữ liệu bệnh nhân (prescriptions.db)!");
+        return;
+    }
+    else if (code == PatientDb::RWError) {
+        ui->prop_currentState->clear();
+        operationError("Có lỗi xảy ra trong quá trình sao chép bản sao lưu!");
         return;
     }
 
-    QDir dir(dbDirPath);
-    dir.removeRecursively();
-
-    QDirIterator it(restoreDir, QDirIterator::Subdirectories);
-    while (it.hasNext()) {
-        QString sourcePath = it.next();
-        QStringList fileName = sourcePath.split("/");
-
-        QFile(sourcePath).copy(dbDirPath + "/" + fileName[fileName.count() - 1]);
-    }
     ui->prop_currentState->setText("Đã khôi phục thành công!");
 }
 
-// Switching cell
-void PrescriptorMainWin::enterName() {
-    ui->pre_addressInput->setFocus();
-}
-
-void PrescriptorMainWin::enterAddress() {
-    ui->pre_birthInput->setFocus();
-    ui->pre_birthInput->setCursorPosition(0);
+void PrescriptorMainWin::switchCell(QLineEdit *from, QLineEdit *to) {
+    connect(from, &QLineEdit::returnPressed, to, [to]() {to->setFocus();});
 }
 
 void PrescriptorMainWin::enterBOD() {
-    ui->pre_YearsOld->setText("(" + QString::number(QDate::currentDate().year() - ui->pre_birthInput->text().split('/')[2].toInt()) +" tuổi)");
-    ui->pre_phoneNumberInput->setFocus();
-}
-
-void PrescriptorMainWin::enterPhoneNum() {
-    ui->pre_rightNoGlassInput->setFocus();
-}
-
-void PrescriptorMainWin::enterRightNoGlass() {
-    ui->pre_rightGlassDioptreInput->setFocus();
-}
-
-void PrescriptorMainWin::enterRightDioptre() {
-    ui->pre_rightGlassVisionInput->setFocus();
-}
-
-void PrescriptorMainWin::enterRightWithGlass() {
-    ui->pre_rightEyePressureInput->setFocus();
-}
-
-void PrescriptorMainWin::enterRightPressure() {
-    ui->pre_leftNoGlassInput->setFocus();
-}
-
-void PrescriptorMainWin::enterLeftNoGlass() {
-    ui->pre_leftGlassDioptreInput->setFocus();
-}
-
-void PrescriptorMainWin::enterLeftDioptre() {
-    ui->pre_leftGlassVisionInput->setFocus();
-}
-
-void PrescriptorMainWin::enterLeftWithGlass() {
-    ui->pre_leftEyePressureInput->setFocus();
-}
-
-void PrescriptorMainWin::enterLeftPressure() {
-    ui->pre_resultInput->setFocus();
+    QStringList birth = ui->pre_birthInput->text().split('/');
+    if (birth.count() == 3)
+        ui->pre_YearsOld->setText("(" + QString::number(QDate::currentDate().year() - ui->pre_birthInput->text().split('/')[2].toInt()) +" tuổi)");
+    else
+        ui->pre_YearsOld->clear();
 }

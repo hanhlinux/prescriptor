@@ -1,23 +1,19 @@
 #include "printer.h"
 
-
 Printer::Printer() {}
 
-void Printer::prepareTemplate(const QString &dirPath) {
+bool Printer::prepareTemplate(const QString &dirPath, QWidget *prev) {
     QTextStream input;
     QStringList temp;
     QFont font;
-    font.setFamily("Times New Roman");
-    font.setPointSize(18);
 
-    if (!QDir(dirPath).exists())
-        QDir().mkpath(dirPath);
-
+    preview = prev;
+    font.setFamily("Calibri");
+    font.setPointSize(16);
     templateFile.setFileName(dirPath + "/template.html");
 
     if (!templateFile.exists() || !templateFile.open(QFile::ReadWrite)) {
-        QMessageBox::critical(nullptr, "Lỗi", "Thiếu file mẫu đơn của phần mềm HOẶC file mẫu đơn không thể mở được");
-        exit(1);
+        return false;
     }
 
     input.setDevice(&templateFile);
@@ -26,9 +22,7 @@ void Printer::prepareTemplate(const QString &dirPath) {
 
     templateContent = temp.join("\n");
     prescriptionPdfDoc = new QPdfDocument();
-
     prescriptionOutput.setDefaultFont(font);
-
     pageLayout.setPageSize(QPageSize::A5, QMarginsF(15, 15, 15, 15));
     pageLayout.setOrientation(QPageLayout::Portrait);
     pageLayout.setUnits(QPageLayout::Millimeter);
@@ -39,69 +33,90 @@ void Printer::prepareTemplate(const QString &dirPath) {
     prescriptionPrinter.setPageLayout(pageLayout);
     prescriptionPrinter.setResolution(300);
     prescriptionPrinter.setOutputFormat(QPrinter::PdfFormat);
+
+    return true;
 }
 
-void Printer::exportAndShowPrescription(const PatientCase &patientCase, const PatientDb &patientDb) {
-    QStringList drugs;
+QString Printer::loadPatientInfo(const PatientCase &patientCase, const PatientDb &patientDb) {
     QString result = patientCase.result;
     QString diagnosis = patientCase.diagnosis;
+    QStringList drugs;
+    QStringList prescribeDMY = patientCase.prescribeDate.split(" ")[0].split("-");
+    QString allNotes;
+    QString prescriptionContent = templateContent;
+
     result.replace("\n", "<br>");
     diagnosis.replace("\n", "<br>");
 
-    templateContent.replace("$SHOPNAME$", patientDb.shopName);
-    templateContent.replace("$SHOPADDRESS$", patientDb.shopAddress);
-    templateContent.replace("$SHOPPHONE$", patientDb.shopPhoneNum);
-    templateContent.replace("$DOCTORNAME$", patientDb.doctorName);
+    prescriptionContent.replace("$SHOPNAME$", patientDb.shopName);
+    prescriptionContent.replace("$SHOPADDRESS$", patientDb.shopAddress);
+    prescriptionContent.replace("$SHOPPHONE$", patientDb.shopPhoneNum);
+    prescriptionContent.replace("$DOCTORNAME$", patientDb.doctorName);
 
-    templateContent.replace("$PATIENTNAME$", patientCase.name);
-    templateContent.replace("$PATIENTBIRTH$", patientCase.dateOfBirth);
-    templateContent.replace("$PATIENTADDRESS$", patientCase.address);
-    templateContent.replace("$PATIENTPHONENUMBER$", patientCase.phoneNumber);
-    templateContent.replace("$PATIENTRESULT$", result);
-    templateContent.replace("$PATIENTDIAGNOSIS$", diagnosis);
-    templateContent.replace("$PATIENTPRESCRIBEDATE$", patientCase.prescribeDate);
+    prescriptionContent.replace("$PATIENTNAME$", patientCase.name);
+    prescriptionContent.replace("$PATIENTBIRTH$", patientCase.dateOfBirth);
+    prescriptionContent.replace("$PATIENTADDRESS$", patientCase.address);
+    prescriptionContent.replace("$PATIENTPHONENUMBER$", patientCase.phoneNumber);
+    prescriptionContent.replace("$PATIENTRESULT$", result);
+    prescriptionContent.replace("$PATIENTDIAGNOSIS$", diagnosis);
+    prescriptionContent.replace("$PATIENTPRESCRIBETIME$", patientCase.prescribeDate);
+    prescriptionContent.replace("$PATIENTNOTE$", patientCase.note);
+    prescriptionContent.replace("$PD$", prescribeDMY[0]);
+    prescriptionContent.replace("$PM$", prescribeDMY[1]);
+    prescriptionContent.replace("$PY$", prescribeDMY[2]);
 
-    templateContent.replace("$RNG$", patientCase.rightNoGlass);
-    templateContent.replace("$RD$", patientCase.rightDioptre);
-    templateContent.replace("$RWG$", patientCase.rightWithGlass);
-    templateContent.replace("$RP$", patientCase.rightPressure);
-    templateContent.replace("$LNG$", patientCase.leftNoGlass);
-    templateContent.replace("$LD$", patientCase.leftDioptre);
-    templateContent.replace("$LWG$", patientCase.leftWithGlass);
-    templateContent.replace("$LP$", patientCase.leftPressure);
+    prescriptionContent.replace("$RNG$", patientCase.rightNoGlass);
+    prescriptionContent.replace("$RD$", patientCase.rightDioptre);
+    prescriptionContent.replace("$RWG$", patientCase.rightWithGlass);
+    prescriptionContent.replace("$RP$", patientCase.rightPressure);
+    prescriptionContent.replace("$LNG$", patientCase.leftNoGlass);
+    prescriptionContent.replace("$LD$", patientCase.leftDioptre);
+    prescriptionContent.replace("$LWG$", patientCase.leftWithGlass);
+    prescriptionContent.replace("$LP$", patientCase.leftPressure);
 
-
+    if (patientCase.note.length() > 0) {
+        allNotes += "<li>" + patientCase.note + "</li>\n";
+    }
     if (patientCase.gender == PatientCase::Male) {
-        templateContent.replace("$PATIENTGENDER$", "Nam");
+        prescriptionContent.replace("$PATIENTGENDER$", "Nam");
     }
     else {
-        templateContent.replace("$PATIENTGENDER$", "Nữ");
+        prescriptionContent.replace("$PATIENTGENDER$", "Nữ");
     }
 
     if (patientCase.revisitPeriod != "") {
-        templateContent.replace("$PATIENTREVISIT$", "Hẹn tái khám bệnh nhân sau " + patientCase.revisitPeriod);
+        prescriptionContent.replace("$PATIENTREVISIT$", "Hẹn tái khám bệnh nhân sau " + patientCase.revisitPeriod);
+        allNotes += "<li>Hẹn tái khám bệnh nhân sau " + patientCase.revisitPeriod + "</li>\n";
     }
     else {
-        templateContent.replace("$PATIENTREVISIT$", "");
+        prescriptionContent.replace("$PATIENTREVISIT$", "");
     }
 
     if (patientCase.warnNoPhone == true) {
-        templateContent.replace("$PATIENTWARNNOPHONE$", "Hạn chế tiếp xúc với các thiết bị điện tử như TV, iPad (tablet), điện thoại thông minh,...");
+        prescriptionContent.replace("$PATIENTWARNNOPHONE$", "Hạn chế tiếp xúc với các thiết bị điện tử như TV, iPad (tablet), điện thoại thông minh,...");
+        allNotes += "<li>Hạn chế tiếp xúc với các thiết bị điện tử như TV, iPad (tablet), điện thoại thông minh,...</li>\n";
     }
     else {
-        templateContent.replace("$PATIENTWARNNOPHONE$", "");
+        prescriptionContent.replace("$PATIENTWARNNOPHONE$", "");
     }
 
     for (int i = 0; i < patientCase.drugsList.count(); i++) {
         drugs << "<li>" + addElement(patientCase.drugsList[i][0])
-                    + addElement(patientCase.drugsList[i][1])
-                    + addElement(patientCase.drugsList[i][2] + ".")
-                    + "</li>";
+        + addElement(patientCase.drugsList[i][1])
+            + addElement(patientCase.drugsList[i][2] + ".")
+            + "</li>";
     }
 
-    templateContent.replace("$PATIENTDRUGS$", drugs.join("\n"));
+    prescriptionContent.replace("$PATIENTDRUGS$", drugs.join("\n"));
+    prescriptionContent.replace("$PATIENTALLNOTES$", allNotes);
+    return prescriptionContent;
+}
 
-    prescriptionOutput.setHtml(templateContent);
+
+void Printer::exportAndShowPrescription(const PatientCase &patientCase, const PatientDb &patientDb) {
+    if (patientCase.prescribeDate.length() == 0) return;
+
+    prescriptionOutput.setHtml(loadPatientInfo(patientCase, patientDb));
 
     prescriptionPrinter.setOutputFileName(
         QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/"
@@ -112,11 +127,10 @@ void Printer::exportAndShowPrescription(const PatientCase &patientCase, const Pa
     prescriptionViewer.setDocument(prescriptionPdfDoc);
     prescriptionViewer.setZoomMode(QPdfView::ZoomMode::FitInView);
     prescriptionPrinter.setOutputFileName(0);
-    prescriptionViewer.resize(800, 600);
-    prescriptionViewer.show();
-    prescriptionViewer.raise();
+    preview->layout()->addWidget(&prescriptionViewer);
 
     QPrintDialog printDiag(&prescriptionPrinter);
+
     if (printDiag.exec() == QDialog::Accepted) {
         prescriptionOutput.print(&prescriptionPrinter);
     }
