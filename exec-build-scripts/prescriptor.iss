@@ -41,8 +41,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "C:\Users\kuan\Documents\Prescriptor\build\Desktop_Qt_6_9_3_MinGW_64_bit-Release\release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\kuan\Documents\Prescriptor\build\Desktop_Qt_6_9_3_MinGW_64_bit-Release\release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: ""; DestDir: "{app}"; Flags: ignoreversion
+Source: ""; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Path not specified, please reconfigure it.
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
