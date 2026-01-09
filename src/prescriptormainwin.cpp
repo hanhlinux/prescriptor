@@ -46,7 +46,7 @@ void PrescriptorMainWin::prepareResources() {
     else if (initSuccess == PatientDb::ConnectionErr)
         fatalError("Không kết nối được với CSDL sử dụng lưu đơn thuốc!");
 
-    if(!printer.prepareTemplate(dbDirPath, ui->tabWidget->widget(3)))
+    if(!printer.prepareTemplate(dbDirPath, ui->tabWidget->widget(3), patientDb.fontSize))
         fatalError("Thiếu file mẫu đơn của phần mềm HOẶC file mẫu đơn không thể mở được");
 
     for (int i = 0; i < int(patientDb.completionList.size()); i++) {

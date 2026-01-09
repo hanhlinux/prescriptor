@@ -2,14 +2,14 @@
 
 Printer::Printer() {}
 
-bool Printer::prepareTemplate(const QString &dirPath, QWidget *prev) {
+bool Printer::prepareTemplate(const QString &dirPath, QWidget *prev, float fontSize) {
     QTextStream input;
     QStringList temp;
     QFont font;
 
     preview = prev;
     font.setFamily("Calibri");
-    font.setPointSize(16);
+    font.setPixelSize(fontSize);
     templateFile.setFileName(dirPath + "/template.html");
 
     if (!templateFile.exists() || !templateFile.open(QFile::ReadWrite)) {
@@ -28,7 +28,7 @@ bool Printer::prepareTemplate(const QString &dirPath, QWidget *prev) {
     pageLayout.setUnits(QPageLayout::Millimeter);
     QSizeF ps;
     ps.setWidth(prescriptionPrinter.width());
-    ps.setHeight(prescriptionPrinter.width() / 0.75);
+    ps.setHeight(prescriptionPrinter.width() / 0.73);
     prescriptionOutput.setPageSize(ps);
     prescriptionPrinter.setPageLayout(pageLayout);
     prescriptionPrinter.setResolution(300);

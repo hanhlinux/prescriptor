@@ -10,6 +10,8 @@
 #include <QStringList>
 #include <QDirIterator>
 
+#define FONTSIZE 20
+
 class PatientDb: public QObject
 {
     Q_OBJECT
@@ -21,6 +23,7 @@ public:
     enum ErrType {Success, CreationErr, ConnectionErr, CorruptedBackup, RWError};
     QSettings *prescriptorInfo;
     QString shopName, shopPhoneNum, shopAddress, doctorName;
+    float fontSize;
     QSqlQuery *query;
     QStringList drugsTableHeader, searchTableHeader, completionList;
 

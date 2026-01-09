@@ -32,8 +32,6 @@ class PrescriptorMainWin : public QMainWindow
 public:
     PrescriptorMainWin(QWidget *parent = nullptr);
     ~PrescriptorMainWin();
-    void switchCell(QLineEdit *from, QLineEdit *to);
-    void resAndDiagEnter(QLineEdit *current, QTextEdit *list, QLineEdit *next, int type);
 
 public slots:
     void clearAll();
@@ -86,5 +84,7 @@ private:
     void setupPropertiesTab();
     void operationError(const QString &msg);
     void fatalError(const QString &msg);
+    void switchCell(QLineEdit *from, QLineEdit *to);
+    void resAndDiagEnter(QLineEdit *current, QTextEdit *list, QLineEdit *next, int type);
 };
 #endif // PRESCRIPTORMAINWIN_H

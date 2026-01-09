@@ -16,16 +16,17 @@
 #include <QPdfDocument>
 #include <QWidget>
 #include <QLayout>
+#include <QObject>
 
 #include "patientcase.h"
 #include "patientdb.h"
 
-class Printer
+class Printer: public QObject
 {
 public:
     Printer();
 
-    bool prepareTemplate(const QString &dirPath, QWidget *prev);
+    bool prepareTemplate(const QString &dirPath, QWidget *prev, float fontSize);
     void processTemplate();
     void exportAndShowPrescription(const PatientCase &patientCase, const PatientDb &patientDb);
 

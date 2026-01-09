@@ -60,13 +60,17 @@ void PatientDb::prepareSettings() {
         prescriptorInfo->setValue("info/shopphonenum", "");
         prescriptorInfo->setValue("info/shopaddress", "");
         prescriptorInfo->setValue("info/doctorname", "");
+        prescriptorInfo->setValue("info/fontSize", 20);
         prescriptorInfo->sync();
     }
     else {
+        bool converted;
         shopName = prescriptorInfo->value("info/shopname").toString();
         shopAddress = prescriptorInfo->value("info/shopaddress").toString();
         shopPhoneNum = prescriptorInfo->value("info/shopphonenum").toString();
         doctorName = prescriptorInfo->value("info/doctorname").toString();
+        fontSize = prescriptorInfo->value("info/fontSize").toInt(&converted);
+        if (!converted) fontSize = FONTSIZE;
     }
 }
 
