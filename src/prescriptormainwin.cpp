@@ -120,10 +120,11 @@ void PrescriptorMainWin::setupPrescribeTab() {
     connect(ui->pre_drugUsageInput, &QLineEdit::returnPressed, this, &PrescriptorMainWin::drugsUseEnter);
     connect(ui->pre_savePreBtn, &QPushButton::clicked, this, &PrescriptorMainWin::savePre);
     connect(ui->pre_revisitCheckbox, &QCheckBox::checkStateChanged, this, &PrescriptorMainWin::revisitCheck);
+    // Dirty-fix approach for lineEdit completion
     connect(ui->pre_resultInput, &QLineEdit::returnPressed, this,
-            [this]() {resAndDiagEnter(ui->pre_resultInput, ui->pre_resultListInput, ui->pre_diagnosisInput, DataCompletion::Result);});
+            [this]() {resAndDiagEnter(ui->pre_resultInput, ui->pre_resultListInput, ui->pre_diagnosisInput, DataCompletion::Result);}, Qt::QueuedConnection);
     connect(ui->pre_diagnosisInput, &QLineEdit::returnPressed, this,
-            [this]() {resAndDiagEnter(ui->pre_diagnosisInput, ui->pre_diagnosisListInput, ui->pre_drugsInput, DataCompletion::Diagnosis);});
+            [this]() {resAndDiagEnter(ui->pre_diagnosisInput, ui->pre_diagnosisListInput, ui->pre_drugsInput, DataCompletion::Diagnosis);}, Qt::QueuedConnection);
 
     connect(dataCompletion[0].completer, qOverload<const QString&>(&QCompleter::activated),
             this, [this]() {ui->pre_resultInput->clear();}, Qt::QueuedConnection);
