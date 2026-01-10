@@ -128,7 +128,7 @@ void PrescriptorMainWin::setupPrescribeTab() {
     connect(dataCompletion[0].completer, qOverload<const QString&>(&QCompleter::activated),
             this, [this]() {ui->pre_resultInput->clear();}, Qt::QueuedConnection);
     connect(dataCompletion[1].completer, qOverload<const QString&>(&QCompleter::activated),
-            this, [this]() {ui->pre_resultInput->clear();}, Qt::QueuedConnection);
+            this, [this]() {ui->pre_diagnosisInput->clear();}, Qt::QueuedConnection);
     connect(ui->pre_printPreBtn, &QPushButton::clicked, this, &PrescriptorMainWin::printPatientInfo);
 }
 

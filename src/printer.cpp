@@ -120,7 +120,7 @@ void Printer::exportAndShowPrescription(const PatientCase &patientCase, const Pa
 
     prescriptionPrinter.setOutputFileName(
         QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/"
-        + QDateTime::currentDateTime().toString("dd-MM-yyyy-HH-mm-ss") + ".pdf");
+         + "temp.pdf");
     prescriptionPrinter.outputFileName();
     prescriptionOutput.print(&prescriptionPrinter);
     prescriptionPdfDoc->load(prescriptionPrinter.outputFileName());
